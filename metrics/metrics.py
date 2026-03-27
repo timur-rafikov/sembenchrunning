@@ -19,6 +19,7 @@ from metrics.val_runner import run_val, ValResult
 class PlanningMetrics:
     """Metrics for a single plan prediction (all inputs in PDDL)."""
 
+    domain_conformance: bool
     executability: bool
     reachability: bool
     optimality_ratio: float  # opt_len / pred_len when goal reached; -1.0 otherwise
@@ -51,6 +52,7 @@ def compute_metrics(
 
     Returns:
         PlanningMetrics with:
+        - domain_conformance: predicted plan parses/typechecks against the domain/problem in VAL
         - executability/reachability from VAL
         - optimality_ratio only when a reference exists and the goal is reached
           (len(pred)/len(ref); empty pred with non-empty ref is 0.0)
@@ -96,6 +98,7 @@ def compute_metrics(
             optimality_ratio = opt_len / pred_len
 
     return PlanningMetrics(
+        domain_conformance=val_result.domain_conformant,
         executability=val_result.executable,
         reachability=val_result.goal_reached,
         optimality_ratio=round(optimality_ratio, 4) if optimality_ratio >= 0 else -1.0,

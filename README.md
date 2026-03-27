@@ -177,6 +177,7 @@ python run_benchmark.py ^
   - `status`: `metrics_computed` или `pipeline_failed`,
   - `failure_reason`: причина сбоя пайплайна (`run_error`, `provider_response_error`, `missing_nl_plan`, `nl2pddl_error`, и т.д.).
 - Primary metrics:
+  - `domain_conformance` — план распознан VAL как корректный план для данного domain/problem; `false`, если VAL сообщает `Bad plan description`, `Bad plan file` и т.п.;
   - `executability` — план исполним по VAL;
   - `reachability` — цель достигнута по VAL;
   - `optimality_ratio` — считается только для планов, достигших цели; иначе `-1`.
@@ -184,4 +185,3 @@ python run_benchmark.py ^
   - `first_val_failure_step` — первый шаг, на котором VAL зафиксировал проблему;
   - `first_ref_deviation_step` — первое расхождение с reference plan, если план достиг цели и reference есть;
   - `first_error_step` — совместимое поле: сначала `first_val_failure_step`, иначе `first_ref_deviation_step`.
-

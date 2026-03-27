@@ -10,7 +10,7 @@ DATA (PDDL: domain + problem + reference plan)
     → Natural Language TEXT (план модели)
     → NL→PDDL (run_translate_nl2pddl)
     → VAL (валидация PDDL-плана)
-    → Метрики (executability, reachability, optimality_ratio)
+    → Метрики (domain_conformance, executability, reachability, optimality_ratio)
 ```
 
 ## Текущая реализация по шагам
@@ -44,7 +44,7 @@ DATA (PDDL: domain + problem + reference plan)
 
 - Вход: PDDL domain, problem (из датасета), plan_pred (из транслятора), plan_ref (из датасета).
 - `compute_metrics` запускает VAL через subprocess, парсит stdout/stderr.
-- Метрики: executability, reachability, optimality_ratio, first_error_step, first_val/ref_deviation_step.
+- Метрики: domain_conformance, executability, reachability, optimality_ratio, first_error_step, first_val/ref_deviation_step.
 - Результаты в `metrics.jsonl` с merge-логикой (новые строки обновляют старые по ключу example_id+model).
 
 ---

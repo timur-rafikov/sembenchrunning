@@ -31,6 +31,7 @@ def write_val_full_log(
         [
             "--- VAL parsed / exit ---",
             f"exit_code: {result.exit_code}",
+            f"domain_conformant: {result.domain_conformant}",
             f"executable: {result.executable}",
             f"goal_reached: {result.goal_reached}",
             f"first_failing_step: {result.first_failing_step}",
@@ -50,6 +51,7 @@ def write_val_full_log(
 class ValResult:
     """Result of VAL validation for a single plan."""
 
+    domain_conformant: bool  # Plan parses/typechecks against the domain/problem
     executable: bool  # All actions applicable in sequence
     goal_reached: bool  # Goal holds after executing the plan
     exit_code: int
@@ -150,6 +152,7 @@ def _parse_val_output(
             stderr = f"VAL execution failed: {run_error}" if run_error is not None else "VAL execution failed."
             exit_code = -1
         return ValResult(
+            domain_conformant=False,
             executable=False,
             goal_reached=False,
             exit_code=exit_code,
@@ -165,7 +168,7 @@ def _parse_val_output(
             "(check --val-binary, working directory, and that the binary is Linux ELF under WSL)."
         )
 
-    executable = goal_reached = False
+    domain_conformant = executable = goal_reached = False
     first_failing_step: Optional[int] = None
 
     combined = f"{stdout}\n{stderr}".lower()
@@ -193,18 +196,27 @@ def _parse_val_output(
 
     if result.returncode == 0:
         if any(t in combined for t in _PLAN_READ_OR_SYNTAX_FAILURE_TOKENS):
+            domain_conformant = False
             executable = False
             goal_reached = False
         else:
+            domain_conformant = True
             executable = True
             goal_reached = not any(token in combined for token in _GOAL_FAILURE_TOKENS)
     else:
+        has_plan_read_failure = any(t in combined for t in _PLAN_READ_OR_SYNTAX_FAILURE_TOKENS)
         has_goal_failure = any(t in combined for t in _GOAL_FAILURE_TOKENS)
         has_action_failure = any(t in combined for t in _ACTION_FAILURE_TOKENS)
-        if has_goal_failure and not has_action_failure:
+        if has_plan_read_failure:
+            domain_conformant = False
+            executable = False
+            goal_reached = False
+        elif has_goal_failure and not has_action_failure:
+            domain_conformant = True
             executable = True
             goal_reached = False
         else:
+            domain_conformant = True
             executable = False
             goal_reached = False
             time_matches = re.findall(r"happening\s*\(\s*time\s+(\d+)\s*\)", combined)
@@ -224,11 +236,15 @@ def _parse_val_output(
 
     debug_val = os.environ.get("DEBUG_VAL", "")
     if debug_val:
-        print(f"[VAL DEBUG] exit={result.returncode} exec={executable} goal={goal_reached}")
+        print(
+            f"[VAL DEBUG] exit={result.returncode} domain_ok={domain_conformant} "
+            f"exec={executable} goal={goal_reached}"
+        )
         print(f"[VAL DEBUG] stdout: {stdout[:500] if stdout else '(empty)'}")
         print(f"[VAL DEBUG] stderr: {stderr[:500] if stderr else '(empty)'}")
 
     return ValResult(
+        domain_conformant=domain_conformant,
         executable=executable,
         goal_reached=goal_reached,
         exit_code=result.returncode,

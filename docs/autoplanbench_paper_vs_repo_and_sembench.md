@@ -65,6 +65,7 @@
 
 - **В статье:** Acc (цель достигнута), Acc0 (план полностью исполним), LF (длина исполнимой части / оптимальная длина).
 - **В sembenchrunning:**  
+  - **domain_conformance** — план вообще распознан валидатором как план для данного домена/задачи;  
   - **executability** — все действия применимы по VAL;  
   - **reachability** — цель достигнута по VAL;  
   - **optimality_ratio** — длина предсказанного плана / длина эталонного (если 0 PDDL-шагов при непустом плане → -1 и исключение из среднего);  
@@ -97,7 +98,7 @@
 | Использование AutoPlanBench | Полный пайплайн (domain setup + P-LLM + T-LLM + оценка) | Только PDDL→NL (промпт) и NL→PDDL (run_translate_nl2pddl), плюс domain setup для domain_description |
 | Интерактив / domain engine | Есть (ReAct, Act) | Нет |
 | Структура данных | По доменам (domain_name, orig_inst, instances) | section / subsection / sample_name, sample.json с путями |
-| Метрики | Acc, Acc0, LF; BFS/random | executability, reachability, optimality_ratio, first_error_step |
+| Метрики | Acc, Acc0, LF; BFS/random | domain_conformance, executability, reachability, optimality_ratio, first_error_step |
 | Подготовка данных | Скрипты репо под 12 доменов | prepare_autoplanbench_data.py под свой датасет, ensure_domain_json в run |
 | VAL | Внутри domain engine и при финальной проверке | Отдельный шаг после NL2PDDL; опционально output_dir и debug stderr |
 

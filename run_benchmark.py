@@ -150,6 +150,34 @@ def _write_run_json(
   path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _attach_metrics_to_run_data(
+  payload: Dict[str, Any],
+  *,
+  status: str,
+  failure_reason: Optional[str],
+  domain_conformance: bool,
+  executability: bool,
+  reachability: bool,
+  optimality_ratio: float,
+  first_val_failure_step: int,
+  first_ref_deviation_step: int,
+) -> None:
+  """Persist per-run metrics and diagnostics back into the run JSON payload."""
+  payload["status"] = status
+  payload["failure_reason"] = failure_reason
+  payload["domain_conformance"] = bool(domain_conformance)
+  payload["executability"] = bool(executability)
+  payload["reachability"] = bool(reachability)
+  payload["optimality_ratio"] = float(optimality_ratio)
+  payload["first_val_failure_step"] = int(first_val_failure_step)
+  payload["first_ref_deviation_step"] = int(first_ref_deviation_step)
+  payload["first_error_step"] = (
+    int(first_val_failure_step)
+    if int(first_val_failure_step) >= 0
+    else int(first_ref_deviation_step)
+  )
+
+
 from openrouter_client import (
   InsufficientBalanceError,
   OpenRouterAPIError,
@@ -1051,9 +1079,11 @@ async def _run_single_prompt(
     except Exception:
       pass
 
-  _debug(f"  sending request id={item.id} -> {out_path.name} ...")
-  t0 = time.time()
   async with semaphore:
+    # Лог и t0 внутри семафора: иначе все задачи печатают «sending» одновременно, хотя часть
+    # ещё ждёт слот; длительность ниже — время запроса к API, без очереди на семафор.
+    _debug(f"  sending request id={item.id} -> {out_path.name} ...")
+    t0 = time.time()
     try:
       response_json = await client.generate_plan(model_cfg=model_cfg, prompt=item.prompt)
       _debug(f"  response received id={item.id} in {time.time() - t0:.1f}s")
@@ -1359,6 +1389,7 @@ def compute_metrics_phase(
   allow_reasoning_fallback: bool = False,
   models_config_path: Optional[Path] = None,
   val_log_dir: Optional[Path] = None,
+  aggregate_confidence: float = 0.95,
 ) -> None:
   """По run JSON в output_dir и датасету считает метрики и пишет metrics.jsonl.
   Если задан limit>0, обрабатываются run только для сэмплов из множества
@@ -1575,6 +1606,7 @@ def compute_metrics_phase(
     model_name: str,
     section: Optional[str],
     subsection: Optional[str],
+    domain_conformance: bool,
     executability: bool,
     reachability: bool,
     optimality_ratio: float,
@@ -1594,6 +1626,7 @@ def compute_metrics_phase(
       "subsection": subsection,
       "status": status,
       "failure_reason": failure_reason,
+      "domain_conformance": domain_conformance,
       "executability": executability,
       "reachability": reachability,
       "optimality_ratio": optimality_ratio,
@@ -1616,6 +1649,7 @@ def compute_metrics_phase(
         run_id=run_id_value,
         example_id=example_id,
         model=model_name,
+        domain_conformance=float(domain_conformance),
         executability=float(executability),
         reachability=float(reachability),
         optimality_ratio=optimality_ratio,
@@ -1662,6 +1696,7 @@ def compute_metrics_phase(
         model_name=_model_display_key(None, parts),
         section=None,
         subsection=None,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1676,6 +1711,37 @@ def compute_metrics_phase(
     model_name = _model_display_key(data, parts)
     _merge_sembench_translator_meta(data, metrics_meta_patch)
     dbg_path = path.with_name(path.stem + "__nl2pddl_debug.json")
+
+    def _persist_run_metrics(
+      *,
+      status: str,
+      failure_reason: Optional[str],
+      domain_conformance: bool,
+      executability: bool,
+      reachability: bool,
+      optimality_ratio: float,
+      first_val_failure_step: int,
+      first_ref_deviation_step: int,
+    ) -> None:
+      _attach_metrics_to_run_data(
+        data,
+        status=status,
+        failure_reason=failure_reason,
+        domain_conformance=domain_conformance,
+        executability=executability,
+        reachability=reachability,
+        optimality_ratio=optimality_ratio,
+        first_val_failure_step=first_val_failure_step,
+        first_ref_deviation_step=first_ref_deviation_step,
+      )
+      _write_run_json(
+        path,
+        data,
+        with_nl2pddl_debug=dbg_path.is_file(),
+        dataset_dir=dataset_dir,
+        domain_setup_seed=int(domain_setup_seed),
+      )
+
     try:
       _write_run_json(
         path,
@@ -1695,6 +1761,7 @@ def compute_metrics_phase(
         model_name=model_name,
         section=None,
         subsection=None,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1713,11 +1780,25 @@ def compute_metrics_phase(
       err = data.get("error")
       err_type = err.get("type") if isinstance(err, dict) else None
       failure_reason = f"run_error:{err_type}" if err_type else "run_error"
+      try:
+        _persist_run_metrics(
+          status="pipeline_failed",
+          failure_reason=failure_reason,
+          domain_conformance=False,
+          executability=False,
+          reachability=False,
+          optimality_ratio=-1.0,
+          first_val_failure_step=-1,
+          first_ref_deviation_step=-1,
+        )
+      except OSError as e:
+        print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e}", flush=True)
       _append_metric_row(
         example_id=str(example_id),
         model_name=model_name,
         section=section,
         subsection=subsection,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1733,11 +1814,25 @@ def compute_metrics_phase(
     provider_error = _provider_error_from_response(resp) if isinstance(resp, dict) else None
     if provider_error is not None:
       _debug(f"    mark failure: provider error in response")
+      try:
+        _persist_run_metrics(
+          status="pipeline_failed",
+          failure_reason="provider_response_error",
+          domain_conformance=False,
+          executability=False,
+          reachability=False,
+          optimality_ratio=-1.0,
+          first_val_failure_step=-1,
+          first_ref_deviation_step=-1,
+        )
+      except OSError as e:
+        print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e}", flush=True)
       _append_metric_row(
         example_id=str(example_id),
         model_name=model_name,
         section=section,
         subsection=subsection,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1753,11 +1848,25 @@ def compute_metrics_phase(
     sample = _load_sample_pddl(dataset_dir, section, subsection, sample_index, example_id=example_id)
     if sample is None:
       print(f"[sembenchrunning] Skip {path.name}: sample not found in dataset for id {example_id!r}", flush=True)
+      try:
+        _persist_run_metrics(
+          status="pipeline_failed",
+          failure_reason="missing_sample",
+          domain_conformance=False,
+          executability=False,
+          reachability=False,
+          optimality_ratio=-1.0,
+          first_val_failure_step=-1,
+          first_ref_deviation_step=-1,
+        )
+      except OSError as e:
+        print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e}", flush=True)
       _append_metric_row(
         example_id=str(example_id),
         model_name=model_name,
         section=section,
         subsection=subsection,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1786,11 +1895,25 @@ def compute_metrics_phase(
         allow_reasoning_fallback=allow_reasoning_fallback,
       ):
         failure_reason = "missing_model_plan_text" if pddl_direct_metrics else "missing_nl_plan"
+      try:
+        _persist_run_metrics(
+          status="pipeline_failed",
+          failure_reason=failure_reason,
+          domain_conformance=False,
+          executability=False,
+          reachability=False,
+          optimality_ratio=-1.0,
+          first_val_failure_step=-1,
+          first_ref_deviation_step=-1,
+        )
+      except OSError as e:
+        print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e}", flush=True)
       _append_metric_row(
         example_id=str(example_id),
         model_name=model_name,
         section=section,
         subsection=subsection,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1806,11 +1929,25 @@ def compute_metrics_phase(
     domain_pddl, problem_pddl, plan_ref_pddl = _get_pddl_from_sample(sample)
     if not domain_pddl or not problem_pddl:
       print(f"[sembenchrunning] Skip {path.name}: missing domain/problem in sample", flush=True)
+      try:
+        _persist_run_metrics(
+          status="pipeline_failed",
+          failure_reason="missing_domain_or_problem",
+          domain_conformance=False,
+          executability=False,
+          reachability=False,
+          optimality_ratio=-1.0,
+          first_val_failure_step=-1,
+          first_ref_deviation_step=-1,
+        )
+      except OSError as e:
+        print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e}", flush=True)
       _append_metric_row(
         example_id=str(example_id),
         model_name=model_name,
         section=section,
         subsection=subsection,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1842,11 +1979,25 @@ def compute_metrics_phase(
       )
     except Exception as e:
       print(f"[sembenchrunning] VAL/metrics error for {path.name}: {e}", flush=True)
+      try:
+        _persist_run_metrics(
+          status="pipeline_failed",
+          failure_reason="val_or_metrics_error",
+          domain_conformance=False,
+          executability=False,
+          reachability=False,
+          optimality_ratio=-1.0,
+          first_val_failure_step=-1,
+          first_ref_deviation_step=-1,
+        )
+      except OSError as e2:
+        print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e2}", flush=True)
       _append_metric_row(
         example_id=str(example_id),
         model_name=model_name,
         section=section,
         subsection=subsection,
+        domain_conformance=False,
         executability=False,
         reachability=False,
         optimality_ratio=-1.0,
@@ -1858,13 +2009,31 @@ def compute_metrics_phase(
         run_data=data,
       )
       continue
-    _debug(f"    metrics: exec={m.executability} reach={m.reachability} opt_ratio={m.optimality_ratio} val_fail={m.first_val_failure_step} ref_dev={m.first_ref_deviation_step}")
+    _debug(
+      f"    metrics: domain_ok={m.domain_conformance} exec={m.executability} "
+      f"reach={m.reachability} opt_ratio={m.optimality_ratio} "
+      f"val_fail={m.first_val_failure_step} ref_dev={m.first_ref_deviation_step}"
+    )
+    try:
+      _persist_run_metrics(
+        status="metrics_computed",
+        failure_reason=None,
+        domain_conformance=bool(m.domain_conformance),
+        executability=bool(m.executability),
+        reachability=bool(m.reachability),
+        optimality_ratio=m.optimality_ratio,
+        first_val_failure_step=m.first_val_failure_step,
+        first_ref_deviation_step=m.first_ref_deviation_step,
+      )
+    except OSError as e:
+      print(f"[sembenchrunning] Warning: could not persist metric status into {path.name}: {e}", flush=True)
 
     _append_metric_row(
       example_id=str(example_id),
       model_name=model_name,
       section=section,
       subsection=subsection,
+      domain_conformance=bool(m.domain_conformance),
       executability=bool(m.executability),
       reachability=bool(m.reachability),
       optimality_ratio=m.optimality_ratio,
@@ -1936,7 +2105,9 @@ def compute_metrics_phase(
       flush=True,
     )
 
-  by_model = aggregate_runs(computed_records, group_by="model")
+  by_model = aggregate_runs(
+    computed_records, group_by="model", confidence=aggregate_confidence
+  )
   print("[sembenchrunning] Aggregate by model:", flush=True)
   for model, stats in by_model.items():
     print(f"  {model}:", flush=True)
@@ -1944,7 +2115,9 @@ def compute_metrics_phase(
       ci = f" [{agg.ci_low:.3f}, {agg.ci_high:.3f}]" if agg.ci_low is not None else ""
       print(f"    {metric}: mean={agg.mean:.4f} std={agg.std:.4f} n={agg.count}{ci}", flush=True)
   if any(r.section for r in computed_records):
-    by_section = aggregate_runs(computed_records, group_by="section")
+    by_section = aggregate_runs(
+      computed_records, group_by="section", confidence=aggregate_confidence
+    )
     print("[sembenchrunning] Aggregate by section:", flush=True)
     for section, stats in by_section.items():
       if not section:
@@ -1954,7 +2127,9 @@ def compute_metrics_phase(
         ci = f" [{agg.ci_low:.3f}, {agg.ci_high:.3f}]" if agg.ci_low is not None else ""
         print(f"    {metric}: mean={agg.mean:.4f} std={agg.std:.4f} n={agg.count}{ci}", flush=True)
   if any(r.subsection for r in computed_records):
-    by_subsection = aggregate_runs(computed_records, group_by="subsection")
+    by_subsection = aggregate_runs(
+      computed_records, group_by="subsection", confidence=aggregate_confidence
+    )
     print("[sembenchrunning] Aggregate by subsection:", flush=True)
     for subsection, stats in by_subsection.items():
       if not subsection:
@@ -2184,6 +2359,16 @@ def parse_args() -> argparse.Namespace:
     help="Только посчитать метрики по уже существующим run в output_dir (нужны --output-dir и --dataset-dir).",
   )
   parser.add_argument(
+    "--aggregate-confidence",
+    type=float,
+    default=0.95,
+    metavar="P",
+    help=(
+      "Уровень доверия для t-интервала в блоках Aggregate by model|section|subsection "
+      "(по умолчанию 0.95). См. также scripts/reaggregate_metrics.py для пересчёта только из metrics.jsonl."
+    ),
+  )
+  parser.add_argument(
     "--rerun-truncated",
     action="store_true",
     help=(
@@ -2401,6 +2586,7 @@ def main() -> None:
       allow_reasoning_fallback=bool(getattr(args, "allow_reasoning_fallback", False)),
       models_config_path=args.config.resolve(),
       val_log_dir=_resolve_val_log_dir(args),
+      aggregate_confidence=float(getattr(args, "aggregate_confidence", 0.95)),
     )
     return
 
@@ -2489,9 +2675,9 @@ def main() -> None:
       allow_reasoning_fallback=bool(getattr(args, "allow_reasoning_fallback", False)),
       models_config_path=args.config.resolve(),
       val_log_dir=_resolve_val_log_dir(args),
+      aggregate_confidence=float(getattr(args, "aggregate_confidence", 0.95)),
     )
 
 
 if __name__ == "__main__":
   main()
-
